@@ -986,3 +986,358 @@ trace_large_x_indx <- function (i) {
 
   return(c(trmat/M, trprod/M^2))
 }
+
+trace_large_x_indx_timer <- function (i) {
+  
+  timers <- list()
+  
+  m <- ndata
+  y <- Y[ , i]
+  e <- matrix(1, nrow=m, ncol=1)
+  y2 <- Y2[ , i] # m x 1  ## GET THIS FROM Y2
+  y3 <- Y3[ , i] ## GET THIS FROM Y3
+
+  M <- m - 1
+  r <- allr[i, , drop = FALSE] / M # 1 x dx ## GET THIS FROM allr
+  r2 <- allr22[i, , drop = FALSE] / M # 1 x dx
+  r3 <- allr31[i, , drop = FALSE] / M # 1 x dx
+  rX <- tcrossprod(X, r) # m x 1
+  r3X <- tcrossprod(X, r3) # m x 1
+  rX3 <- tcrossprod(X3, r) # m x 1
+
+
+  rSq <- r^2
+  rSqX2 <- tcrossprod(X2,rSq) # m x 1
+  r2rSqX2 <- tcrossprod(X2, r2 * rSq) # m x 1
+  r3rX2 <- tcrossprod(X2, r3*r) # m x 1
+
+  timers$tXr <- benchmark(
+      tXr <- tX * as.vector(r), # dx x m
+      replications=1)$elapsed
+
+  y4Sum <- Y4ColSums[i] # scalar ## GET THIS FROM Y4ColSums
+  rSqSum <- sum(rSq) #scalar
+
+  timers$Z1 <- benchmark(
+      Z1 <- X2 %*% tXr, # m x m
+      replications=1)$elapsed
+  timers$Z2 <- benchmark(
+      Z2 <- X2 %*% tXr^2, # m x m
+      replications=1)$elapsed
+
+  #All of these are scalars
+  #TODO: Normalize them by (m-1)^2 after they are working correctly.
+
+  timers$AA <- benchmark(
+      AA <- quad.form(XXt2, y2),
+      replications=1)$elapsed
+
+  timers$AB1 <- benchmark(
+      AB1 <- y4Sum * crossprod(y2, rX^2),
+      replications=1)$elapsed
+
+  timers$AB2 <- benchmark(
+      AB2 <- quad.3form(XXt, y, y2 * tcrossprod(X, r2*r)),
+      replications=1)$elapsed
+
+  timers$AB3 <- benchmark(
+      AB3 <- AB2,
+      replications=1)$elapsed
+
+  timers$AB4 <- benchmark(
+      AB4 <- quad.3form(Z1^2, e, y2),
+      replications=1)$elapsed
+
+  timers$AC1 <- benchmark(
+      AC1 <- crossprod(rX * r3X, y2) * M,
+      replications=1)$elapsed
+
+  timers$AC2 <- benchmark(
+      AC2 <- quad.3form(Z1 * XXt, y, y2),
+      replications=1)$elapsed
+
+  AC3 <- AC1
+
+  AC4 <- AC2
+
+  B1B1 <- (y4Sum*rSqSum)^2
+
+  timers$B1B2 <- benchmark(
+      B1B2 <- rSqSum * y4Sum * tcrossprod(r2,rSq) * M,
+      replications=1)$elapsed
+
+  B1B3 <- B1B2
+
+  B1B4 <- y4Sum * sum(rSqX2^2)
+
+  timers$B1C1 <- benchmark(
+      B1C1 <- y4Sum * rSqSum * tcrossprod(r,r3) * M,
+      replications=1)$elapsed
+
+  timers$B1C2 <- benchmark(
+      B1C2 <- y4Sum * crossprod(y, rX * rSqX2),
+      replications=1)$elapsed
+
+  B1C3 <- B1C1
+
+  B1C4 <- B1C2
+
+  timers$B2B2 <- benchmark(
+      B2B2 <- tcrossprod(rSq, r2^2) * rSqSum * M^2,
+      replications=1)$elapsed
+
+  timers$B2B3 <- benchmark(
+      B2B3 <- tcrossprod(rSq, r2)^2 * M^2,
+      replications=1)$elapsed
+
+  B2B4 <- sum(rSqX2 * r2rSqX2) * M
+
+  timers$B2C1 <- benchmark(
+      B2C1 <- tcrossprod(rSq, r2) * tcrossprod(r,r3) * M^2,
+      replications=1)$elapsed
+
+  timers$B2C2 <- benchmark(
+      B2C2 <- crossprod(y, r2rSqX2 * rX) * M,
+      replications=1)$elapsed
+
+  B2C3 <- sum(r * r2 * r3) * rSqSum * M^2
+
+  timers$B2C3 <- benchmark(
+      B2C4 <- crossprod(y, tcrossprod(X, r * r2) * rSqX2) * M,
+      replications=1)$elapsed
+
+  B3B3 <- B2B2
+
+  B3B4 <- B2B4
+
+  B3C1 <- B2C3
+
+  B3C2 <- B2C4
+
+  B3C3 <- B2C1
+
+  B3C4 <- B2C2
+
+
+
+  B4B4 <- sum(Z2^2)
+
+  B4C1 <- sum(rSqX2 * r3rX2) * M
+
+  timers$B4C2 <- benchmark(
+      B4C2 <- quad.3form(Z2 * Z1, e, y),
+      replications=1)$elapsed
+
+  B4C3 <- B4C1
+
+  B4C4 <- B4C2
+
+  C1C1 <- rSqSum * sum(r3^2) * M^2
+
+  timers$C1C2 <- benchmark(
+      C1C2 <- crossprod(y, rSqX2 * r3X) * M,
+      replications=1)$elapsed
+
+  C1C3 <- sum(r * r3)^2 * M^2
+
+  timers$C1C4 <- benchmark(
+      C1C4 <- crossprod(y, rX * r3rX2) * M,
+      replications=1)$elapsed
+
+  timers$C2C2 <- benchmark(
+      C2C2 <- quad.form(Z2 * XXt, y),
+      replications=1)$elapsed
+
+  C2C3 <- C1C4
+
+  timers$C2C4 <- benchmark(
+      C2C4 <- quad.form(Z1*t(Z1), y),
+      replications=1)$elapsed
+
+  C3C3 <- C1C1
+
+  C3C4 <- C1C2
+
+  C4C4 <- C2C2
+
+  resvec <- c(AA, c(AB1, AB2,  AB3,  AB4)/4, -1/2*c( AC1,  AC2,  AC3,  AC4),
+              c(B1B1, B1B2, B1B3, B1B4)/16, -1/8*c(B1C1, B1C2, B1C3, B1C4),
+              c(B2B2, B2B3, B2B4)/16, -1/8*c(B2C1, B2C2, B2C3, B2C4),
+              c(B3B3, B3B4)/16, -1/8*c(B3C1, B3C2, B3C3, B3C4),
+              B4B4/16, -1/8*c(B4C1, B4C2, B4C3, B4C4),
+              c(C1C1, C1C2, C1C3, C1C4,
+                C2C2, C2C3, C2C4,
+                C3C3, C3C4,
+                C4C4)/4)
+  resmat <- matrix(0, 9, 9)
+  resmat[row(resmat) >= col(resmat)] <- resvec
+  trprod <- sum(diag(resmat)) + 2 * sum(resmat[row(resmat) > col(resmat)])
+
+  #Trace of straight up varmat
+  star1 <- crossprod(y2, X2RowSums) #O(m)
+  star2 <- y4Sum * rSqSum
+  star3 <- crossprod(y2, rSqX2) #O(m)
+  star4 <- tcrossprod(rSq, X4ColSums) #O(n)
+  dagger1 <- crossprod(y3, rX) #O(m)
+  dagger2 <- crossprod(y, rX3) #O(m)
+  trmat <- star1 + (star2 + 2 * star3 + star4) / 4 - dagger1 - dagger2
+
+  return(list(traces=c(trmat/M, trprod/M^2),
+              resmat=resmat,
+              timers=timers))
+}
+
+trace_large_x_indx_faster <- function (i) {
+  m <- ndata
+  y <- Y[ , i]
+  e <- matrix(1, nrow=m, ncol=1)
+  y2 <- Y2[ , i] # m x 1  ## GET THIS FROM Y2
+  y3 <- Y3[ , i] ## GET THIS FROM Y3
+
+  M <- m - 1
+  r <- allr[i, , drop = FALSE] / M # 1 x dx ## GET THIS FROM allr
+  r2 <- allr22[i, , drop = FALSE] / M # 1 x dx
+  r3 <- allr31[i, , drop = FALSE] / M # 1 x dx
+  rX <- tcrossprod(X, r) # m x 1
+  r3X <- tcrossprod(X, r3) # m x 1
+  rX3 <- tcrossprod(X3, r) # m x 1
+
+
+  rSq <- r^2
+  rSqX2 <- tcrossprod(X2,rSq) # m x 1
+  r2rSqX2 <- tcrossprod(X2, r2 * rSq) # m x 1
+  r3rX2 <- tcrossprod(X2, r3*r) # m x 1
+
+  tXr <- tX * as.vector(r) # dx x m
+
+  y4Sum <- Y4ColSums[i] # scalar ## GET THIS FROM Y4ColSums
+  rSqSum <- sum(rSq) #scalar
+
+  #Z1 <- X2 %*% tXr # m x m
+  #Z2 <- X2 %*% tXr^2 # m x m
+
+  #All of these are scalars
+  #TODO: Normalize them by (m-1)^2 after they are working correctly.
+
+  AA <- quad.form(XXt2, y2)
+
+  AB1 <- y4Sum * crossprod(y2, rX^2)
+
+  AB2 <- quad.3form(XXt, y, y2 * tcrossprod(X, r2*r))
+
+  AB3 <- AB2
+
+  #AB4 <- quad.3form(Z1^2, e, y2)
+  AB4 <- 0
+
+  AC1 <- crossprod(rX * r3X, y2) * M
+
+  #AC2 <- quad.3form(Z1 * XXt, y, y2)
+  AC2 <- 0
+
+  AC3 <- AC1
+
+  AC4 <- AC2
+
+  B1B1 <- (y4Sum*rSqSum)^2
+
+  B1B2 <- rSqSum * y4Sum * tcrossprod(r2,rSq) * M
+
+  B1B3 <- B1B2
+
+  B1B4 <- y4Sum * sum(rSqX2^2)
+
+  B1C1 <- y4Sum * rSqSum * tcrossprod(r,r3) * M
+
+  B1C2 <- y4Sum * crossprod(y, rX * rSqX2)
+
+  B1C3 <- B1C1
+
+  B1C4 <- B1C2
+
+  B2B2 <- tcrossprod(rSq, r2^2) * rSqSum * M^2
+
+  B2B3 <- tcrossprod(rSq, r2)^2 * M^2
+
+  B2B4 <- sum(rSqX2 * r2rSqX2) * M
+
+  B2C1 <- tcrossprod(rSq, r2) * tcrossprod(r,r3) * M^2
+
+  B2C2 <- crossprod(y, r2rSqX2 * rX) * M
+
+  B2C3 <- sum(r * r2 * r3) * rSqSum * M^2
+
+  B2C4 <- crossprod(y, tcrossprod(X, r * r2) * rSqX2) * M
+
+  B3B3 <- B2B2
+
+  B3B4 <- B2B4
+
+  B3C1 <- B2C3
+
+  B3C2 <- B2C4
+
+  B3C3 <- B2C1
+
+  B3C4 <- B2C2
+
+
+
+  #B4B4 <- sum(Z2^2)
+  B4B4 <- 0
+
+  B4C1 <- sum(rSqX2 * r3rX2) * M
+
+  #B4C2 <- quad.3form(Z2 * Z1, e, y)
+  B4C2 <- 0
+
+  B4C3 <- B4C1
+
+  B4C4 <- B4C2
+
+  C1C1 <- rSqSum * sum(r3^2) * M^2
+
+  C1C2 <- crossprod(y, rSqX2 * r3X) * M
+
+  C1C3 <- sum(r * r3)^2 * M^2
+
+  C1C4 <- crossprod(y, rX * r3rX2) * M
+
+  #C2C2 <- quad.form(Z2 * XXt, y)
+  C2C2 <- 0
+
+  C2C3 <- C1C4
+
+  #C2C4 <- quad.form(Z1*t(Z1), y)
+  C2C4 <- 0
+
+  C3C3 <- C1C1
+
+  C3C4 <- C1C2
+
+  C4C4 <- C2C2
+
+  resvec <- c(AA, c(AB1, AB2,  AB3,  AB4)/4, -1/2*c( AC1,  AC2,  AC3,  AC4),
+              c(B1B1, B1B2, B1B3, B1B4)/16, -1/8*c(B1C1, B1C2, B1C3, B1C4),
+              c(B2B2, B2B3, B2B4)/16, -1/8*c(B2C1, B2C2, B2C3, B2C4),
+              c(B3B3, B3B4)/16, -1/8*c(B3C1, B3C2, B3C3, B3C4),
+              B4B4/16, -1/8*c(B4C1, B4C2, B4C3, B4C4),
+              c(C1C1, C1C2, C1C3, C1C4,
+                C2C2, C2C3, C2C4,
+                C3C3, C3C4,
+                C4C4)/4)
+  resmat <- matrix(0, 9, 9)
+  resmat[row(resmat) >= col(resmat)] <- resvec
+  trprod <- sum(diag(resmat)) + 2 * sum(resmat[row(resmat) > col(resmat)])
+
+  #Trace of straight up varmat
+  star1 <- crossprod(y2, X2RowSums) #O(m)
+  star2 <- y4Sum * rSqSum
+  star3 <- crossprod(y2, rSqX2) #O(m)
+  star4 <- tcrossprod(rSq, X4ColSums) #O(n)
+  dagger1 <- crossprod(y3, rX) #O(m)
+  dagger2 <- crossprod(y, rX3) #O(m)
+  trmat <- star1 + (star2 + 2 * star3 + star4) / 4 - dagger1 - dagger2
+
+  return(c(trmat/M, trprod/M^2))
+}
