@@ -57,10 +57,7 @@ for (i in 1:nsims) {
   
   #trs.result <- trace_large_x_indx_timer(1)
   #trs <- trs.result$traces
-  
-  benchmark(trs1 <- trace_large_x_indx(1),
-            trs2 <- trace_large_x_indx_faster(1)
-  )
+
   a1 <- trs1[2] / trs1[1]
   b1 <- trs1[1] ^ 2 / trs1[2]
   a2 <- trs2[2] / trs2[1]
@@ -72,5 +69,14 @@ for (i in 1:nsims) {
 }
 
 library(ggplot2)
-p <- qplot(pvals1, pvals2)
+p <- qplot(pvals1, pvals2) + geom_abline(slope=1, intercept=0) + 
+  xlab("slow version") + ylab("fast version") + 
+  ggtitle("trace calc comparison")
 ggsave("approx_compare.png", p)
+
+# Save a single benchmark
+time.df <- benchmark(trs1 <- trace_large_x_indx(1),
+                     trs2 <- trace_large_x_indx_faster(1))
+write.table(time.df, quote=FALSE, row.names=FALSE, file="approx_time.txt",
+            sep="\t")
+
